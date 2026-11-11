@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPS Speed Test - Fast & Precise Click Counter</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(6, 182, 212, 0.2)' },
+                            '50%': { boxShadow: '0 0 30px rgba(6, 182, 212, 0.5)' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-6px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-modal {
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        /* Ripple effect on click pad */
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple 0.5s ease-out forwards;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.6) 0%, rgba(147, 51, 234, 0.2) 100%);
+            pointer-events: none;
+            width: 120px;
+            height: 120px;
+            margin-left: -60px;
+            margin-top: -60px;
+        }
+
+        @keyframes ripple {
+            to {
+                transform: scale(3.5);
+                opacity: 0;
+            }
+        }
+
+        /* Prevent highlight artifacting */
+        *:focus {
+            outline: none;
+        }
+
+        /* Custom scrollbar for clean dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-white overflow-x-hidden relative">
+
+    <!-- Background Glow Orbs -->
+    <div class="fixed top-[-10%] left-[-10%] w-[45vw] h-[45vw] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none"></div>
+
+    <!-- Main Container -->
+    <div class="w-full max-w-4xl mx-auto px-4 py-6 flex-1 flex flex-col justify-between relative z-10">
+
+        <!-- Header -->
+        <header class="flex items-center justify-between py-3 mb-6 border-b border-slate-800/80">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
+                        CPS Speed Tester
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium">Test your clicks per second with high accuracy</p>
+                </div>
+            </div>
+
+            <!-- Header Controls -->
+            <div class="flex items-center gap-2">
+                <!-- Sound Toggle -->
+                <button id="soundToggleBtn" class="p-2.5 rounded-xl glass-card hover:bg-slate-800/80 text-slate-300 hover:text-cyan-400 transition-all duration-200 flex items-center gap-2 text-sm font-medium" title="Toggle Sound">
+                    <svg id="soundOnIcon" class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                    </svg>
+                    <svg id="soundOffIcon" class="w-5 h-5 text-slate-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+                    </svg>
+                    <span class="hidden sm:inline text-xs font-semibold" id="soundLabel">Sound ON</span>
+                </button>
+
+                <!-- Reset Button -->
+                <button id="resetBtn" class="p-2.5 rounded-xl glass-card hover:bg-slate-800/80 text-slate-300 hover:text-cyan-400 transition-all duration-200 flex items-center gap-2 text-sm font-medium" title="Reset Test">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span class="hidden sm:inline text-xs font-semibold">Reset</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Controls & Configuration Section -->
+        <section class="glass-card rounded-2xl p-4 sm:p-5 mb-6 space-y-4 shadow-xl">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                <!-- Time Selection -->
+                <div class="space-y-2">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Test Duration
+                    </label>
+                    <div class="flex flex-wrap gap-2" id="durationContainer">
+                        <button data-time="1" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-slate-700/60 bg-slate-900/50 text-slate-300 hover:border-slate-500">1s</button>
+                        <button data-time="5" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-cyan-500 bg-cyan-500/20 text-cyan-300 shadow-md shadow-cyan-500/10 active-time">5s</button>
+                        <button data-time="10" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-slate-700/60 bg-slate-900/50 text-slate-300 hover:border-slate-500">10s</button>
+                        <button data-time="15" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-slate-700/60 bg-slate-900/50 text-slate-300 hover:border-slate-500">15s</button>
+                        <button data-time="30" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-slate-700/60 bg-slate-900/50 text-slate-300 hover:border-slate-500">30s</button>
+                        <button data-time="60" class="time-btn px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-slate-700/60 bg-slate-900/50 text-slate-300 hover:border-slate-500">60s</button>
+                    </div>
+                </div>
+
+                <!-- Click Type Checkboxes -->
+                <div class="space-y-2">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"></path>
+                        </svg>
+                        Accepted Click Types
+                    </label>
+                    <div class="flex items-center gap-4 bg-slate-900/60 border border-slate-800 rounded-xl p-2 px-3">
+                        <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-200 hover:text-white transition-colors">
+                            <input type="checkbox" id="leftClickCb" checked class="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20 focus:ring-offset-0 cursor-pointer accent-cyan-500">
+                            <span>Left Click</span>
+                        </label>
+                        <div class="w-px h-4 bg-slate-800"></div>
+                        <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-200 hover:text-white transition-colors">
+                            <input type="checkbox" id="rightClickCb" checked class="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20 focus:ring-offset-0 cursor-pointer accent-cyan-500">
+                            <span>Right Click</span>
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Warning Alert (Hidden by default) -->
+            <div id="checkboxWarning" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2 text-center animate-pulse">
+                ⚠️ At least one click type (Left or Right) must remain selected!
+            </div>
+        </section>
+
+        <!-- Live Stats HUD -->
+        <section class="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <!-- Time Left -->
+            <div class="glass-card rounded-2xl p-3 sm:p-4 text-center border-l-4 border-l-cyan-500 flex flex-col justify-center">
+                <span class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Time Left</span>
+                <div class="text-2xl sm:text-4xl font-extrabold text-white mt-0.5 tracking-tight" id="timerDisplay">5.0s</div>
+            </div>
+
+            <!-- Total Clicks -->
+            <div class="glass-card rounded-2xl p-3 sm:p-4 text-center border-l-4 border-l-violet-500 flex flex-col justify-center">
+                <span class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Total Clicks</span>
+                <div class="text-2xl sm:text-4xl font-extrabold text-violet-400 mt-0.5 tracking-tight" id="clicksDisplay">0</div>
+            </div>
+
+            <!-- Current CPS -->
+            <div class="glass-card rounded-2xl p-3 sm:p-4 text-center border-l-4 border-l-emerald-500 flex flex-col justify-center">
+                <span class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Current CPS</span>
+                <div class="text-2xl sm:text-4xl font-extrabold text-emerald-400 mt-0.5 tracking-tight" id="cpsDisplay">0.0</div>
+            </div>
+        </section>
+
+        <!-- Main Click Pad -->
+        <main class="flex-1 min-h-[280px] sm:min-h-[340px] relative mb-6">
+            <div id="clickPad" class="w-full h-full rounded-3xl glass-card flex flex-col items-center justify-center p-6 text-center cursor-pointer relative overflow-hidden transition-all duration-150 active:scale-[0.995] border-2 border-dashed border-slate-700/80 hover:border-cyan-500/50 shadow-2xl group">
+                
+                <!-- Inner Animated Visual Elements -->
+                <div id="clickPadPulse" class="absolute inset-0 rounded-3xl bg-cyan-500/5 opacity-0 transition-opacity duration-300 pointer-events-none group-hover:opacity-100"></div>
+
+                <div class="relative z-10 pointer-events-none flex flex-col items-center select-none">
+                    <div id="clickIconContainer" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-900/80 border border-slate-700/60 flex items-center justify-center mb-4 text-cyan-400 group-hover:scale-110 group-hover:border-cyan-500/50 transition-all duration-300 shadow-inner">
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 animate-float" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+                        </svg>
+                    </div>
+
+                    <h2 id="clickPadTitle" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
+                        Click Here To Start!
+                    </h2>
+                    <p id="clickPadSub" class="text-xs sm:text-sm text-slate-400 max-w-xs leading-relaxed">
+                        Test will start automatically on your first valid click inside this zone.
+                    </p>
+                </div>
+
+                <!-- Active Test Progress Bar (Bottom edge) -->
+                <div class="absolute bottom-0 left-0 w-full h-2 bg-slate-900/80 overflow-hidden rounded-b-3xl">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-cyan-500 via-violet-500 to-emerald-400 w-0 transition-all duration-75"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center text-xs text-slate-500 py-2">
+            Tip: You can use both mouse buttons if enabled in settings for higher speed.
+        </footer>
+    </div>
+
+    <!-- Results Modal Overlay -->
+    <div id="resultsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="resultsContent" class="glass-modal w-full max-w-md rounded-3xl p-6 sm:p-8 text-center shadow-2xl transform scale-95 transition-transform duration-300 border border-slate-700/60 relative overflow-hidden">
+            
+            <!-- Radial background ambient light -->
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Rank Badge Header -->
+            <div class="inline-flex items-center justify-center p-3 rounded-2xl bg-slate-900/80 border border-slate-700/60 mb-4 shadow-inner">
+                <span id="rankEmoji" class="text-4xl sm:text-5xl">⚡</span>
+            </div>
+
+            <h3 class="text-xs font-bold uppercase tracking-widest text-cyan-400 mb-1">Test Completed</h3>
+            <h2 id="rankTitle" class="text-2xl sm:text-3xl font-black text-white tracking-tight mb-2">Lightning Fast</h2>
+            <p id="rankDesc" class="text-xs sm:text-sm text-slate-400 mb-6 italic">"Your fingers move faster than thought!"</p>
+
+            <!-- Results Metrics Grid -->
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Final CPS</span>
+                    <div id="modalCps" class="text-2xl sm:text-3xl font-black text-cyan-400 mt-0.5">11.40</div>
+                </div>
+
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Clicks</span>
+                    <div id="modalClicks" class="text-2xl sm:text-3xl font-black text-violet-400 mt-0.5">57</div>
+                </div>
+
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duration</span>
+                    <div id="modalDuration" class="text-lg sm:text-xl font-extrabold text-slate-200 mt-1">5 Seconds</div>
+                </div>
+
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Click Types</span>
+                    <div id="modalTypes" class="text-xs font-bold text-slate-300 mt-2 truncate">Left + Right</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="modalTryAgainBtn" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all duration-200 active:scale-95">
+                    Try Again
+                </button>
+                <button id="modalShareBtn" class="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-sm transition-all duration-200 active:scale-95 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                    </svg>
+                    <span>Share Result</span>
+                </button>
+            </div>
+
+            <!-- Toast alert for copying -->
+            <div id="shareToast" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-full shadow-lg animate-bounce">
+                Copied to clipboard!
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript logic -->
+    <script>
+        // Web Audio API Synthesizer for lag-free sound effects
+        class ClickAudioSynth {
+            constructor() {
+                this.audioCtx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.audioCtx = new AudioContext();
+                    }
+                }
+            }
+
+            playClick(type = 0) {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.audioCtx) return;
+
+                if (this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+
+                try {
+                    const osc = this.audioCtx.createOscillator();
+                    const gain = this.audioCtx.createGain();
+
+                    // Different pitch for left click vs right click
+                    const baseFreq = type === 0 ? 520 : 680;
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(baseFreq, this.audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, this.audioCtx.currentTime + 0.04);
+
+                    gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.04);
+
+                    osc.connect(gain);
+                    gain.connect(this.audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(this.audioCtx.currentTime + 0.04);
+                } catch (e) {
+                    // Ignore audio playback errors
+                }
+            }
+        }
+
+        // State variables
+        let selectedDuration = 5; // Default 5 seconds
+        let allowLeftClick = true;
+        let allowRightClick = true;
+        let testState = 'idle'; // 'idle' | 'running' | 'finished'
+        let clickCount = 0;
+        let startTime = null;
+        let timerInterval = null;
+        let animFrameId = null;
+
+        const soundSynth = new ClickAudioSynth();
+
+        // DOM Elements
+        const clickPad = document.getElementById('clickPad');
+        const clickPadPulse = document.getElementById('clickPadPulse');
+        const clickPadTitle = document.getElementById('clickPadTitle');
+        const clickPadSub = document.getElementById('clickPadSub');
+        const clickIconContainer = document.getElementById('clickIconContainer');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const clicksDisplay = document.getElementById('clicksDisplay');
+        const cpsDisplay = document.getElementById('cpsDisplay');
+        const progressBar = document.getElementById('progressBar');
+
+        const leftClickCb = document.getElementById('leftClickCb');
+        const rightClickCb = document.getElementById('rightClickCb');
+        const checkboxWarning = document.getElementById('checkboxWarning');
+        const durationBtns = document.querySelectorAll('.time-btn');
+
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundOnIcon = document.getElementById('soundOnIcon');
+        const soundOffIcon = document.getElementById('soundOffIcon');
+        const soundLabel = document.getElementById('soundLabel');
+
+        const resetBtn = document.getElementById('resetBtn');
+
+        // Modal Elements
+        const resultsModal = document.getElementById('resultsModal');
+        const resultsContent = document.getElementById('resultsContent');
+        const modalCps = document.getElementById('modalCps');
+        const modalClicks = document.getElementById('modalClicks');
+        const modalDuration = document.getElementById('modalDuration');
+        const modalTypes = document.getElementById('modalTypes');
+        const rankEmoji = document.getElementById('rankEmoji');
+        const rankTitle = document.getElementById('rankTitle');
+        const rankDesc = document.getElementById('rankDesc');
+        const modalTryAgainBtn = document.getElementById('modalTryAgainBtn');
+        const modalShareBtn = document.getElementById('modalShareBtn');
+        const shareToast = document.getElementById('shareToast');
+
+        // Prevent default browser context menu on click pad so right clicks work seamlessly
+        clickPad.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Checkbox Safety Validation
+        function validateCheckboxes(changedCb) {
+            allowLeftClick = leftClickCb.checked;
+            allowRightClick = rightClickCb.checked;
+
+            if (!allowLeftClick && !allowRightClick) {
+                // Re-check the changed one
+                changedCb.checked = true;
+                allowLeftClick = leftClickCb.checked;
+                allowRightClick = rightClickCb.checked;
+
+                // Show temporary warning
+                checkboxWarning.classList.remove('hidden');
+                setTimeout(() => checkboxWarning.classList.add('hidden'), 2500);
+            }
+        }
+
+        leftClickCb.addEventListener('change', () => validateCheckboxes(leftClickCb));
+        rightClickCb.addEventListener('change', () => validateCheckboxes(rightClickCb));
+
+        // Duration Selection
+        durationBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (testState === 'running') return;
+
+                durationBtns.forEach(b => {
+                    b.classList.remove('border-cyan-500', 'bg-cyan-500/20', 'text-cyan-300', 'shadow-md', 'shadow-cyan-500/10', 'active-time');
+                    b.classList.add('border-slate-700/60', 'bg-slate-900/50', 'text-slate-300');
+                });
+
+                btn.classList.remove('border-slate-700/60', 'bg-slate-900/50', 'text-slate-300');
+                btn.classList.add('border-cyan-500', 'bg-cyan-500/20', 'text-cyan-300', 'shadow-md', 'shadow-cyan-500/10', 'active-time');
+
+                selectedDuration = parseInt(btn.dataset.time, 10);
+                resetTest();
+            });
+        });
+
+        // Sound Toggle
+        soundToggleBtn.addEventListener('click', () => {
+            soundSynth.enabled = !soundSynth.enabled;
+            if (soundSynth.enabled) {
+                soundOnIcon.classList.remove('hidden');
+                soundOffIcon.classList.add('hidden');
+                soundLabel.textContent = 'Sound ON';
+            } else {
+                soundOnIcon.classList.add('hidden');
+                soundOffIcon.classList.remove('hidden');
+                soundLabel.textContent = 'Muted';
+            }
+        });
+
+        // Reset Button
+        resetBtn.addEventListener('click', () => {
+            resetTest();
+        });
+
+        // Create Visual Ripple
+        function createRipple(e) {
+            const rect = clickPad.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple-effect';
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+
+            clickPad.appendChild(ripple);
+
+            setTimeout(() => {
+                ripple.remove();
+            }, 500);
+        }
+
+        // Click Pad Mousedown Listener
+        clickPad.addEventListener('mousedown', (e) => {
+            // Check button allowed
+            const buttonType = e.button; // 0 = left, 2 = right
+            
+            if (buttonType === 0 && !allowLeftClick) return;
+            if (buttonType === 2 && !allowRightClick) return;
+            if (buttonType !== 0 && buttonType !== 2) return; // Ignore middle click
+
+            if (testState === 'finished') return;
+
+            // Initialize test on first valid click
+            if (testState === 'idle') {
+                startTest();
+            }
+
+            if (testState === 'running') {
+                clickCount++;
+                clicksDisplay.textContent = clickCount;
+                soundSynth.playClick(buttonType);
+                createRipple(e);
+                updateLiveCPS();
+            }
+        });
+
+        // Start Test Execution
+        function startTest() {
+            testState = 'running';
+            clickCount = 0;
+            startTime = performance.now();
+
+            // Disable settings controls during active test
+            leftClickCb.disabled = true;
+            rightClickCb.disabled = true;
+            durationBtns.forEach(b => b.classList.add('opacity-50', 'cursor-not-allowed'));
+
+            // UI updates
+            clickPadTitle.textContent = 'CLICK! CLICK! CLICK!';
+            clickPadSub.textContent = 'Keep clicking as fast as you can!';
+            clickIconContainer.classList.add('border-cyan-400', 'scale-105');
+            clickPadPulse.classList.add('opacity-100');
+
+            // Timer Loop
+            timerInterval = setInterval(() => {
+                const elapsedSeconds = (performance.now() - startTime) / 1000;
+                const remaining = Math.max(0, selectedDuration - elapsedSeconds);
+
+                timerDisplay.textContent = remaining.toFixed(1) + 's';
+                
+                // Progress Bar
+                const progressPct = Math.min(100, (elapsedSeconds / selectedDuration) * 100);
+                progressBar.style.width = `${progressPct}%`;
+
+                updateLiveCPS();
+
+                if (remaining <= 0) {
+                    finishTest();
+                }
+            }, 30);
+        }
+
+        // Calculate Live CPS
+        function updateLiveCPS() {
+            if (testState !== 'running' || !startTime) return;
+            const elapsed = (performance.now() - startTime) / 1000;
+            if (elapsed > 0) {
+                const currentCPS = (clickCount / elapsed).toFixed(1);
+                cpsDisplay.textContent = currentCPS;
+            }
+        }
+
+        // Get Rank & Badge based on CPS
+        function getCPSRank(cps) {
+            if (cps < 3.0) {
+                return {
+                    emoji: '🐢',
+                    title: 'Sloth Speed',
+                    desc: 'Warming up those fingers? Keep practicing!'
+                };
+            } else if (cps < 5.5) {
+                return {
+                    emoji: '🐇',
+                    title: 'Casual Striker',
+                    desc: 'Steady and easygoing pace. You\'re getting there!'
+                };
+            } else if (cps < 7.5) {
+                return {
+                    emoji: '🐆',
+                    title: 'Fast Clicker',
+                    desc: 'Above average speed! Great hand-eye speed.'
+                };
+            } else if (cps < 9.5) {
+                return {
+                    emoji: '⚡',
+                    title: 'Lightning Finger',
+                    desc: 'Serious speed! You\'re clicking at competitive speeds.'
+                };
+            } else if (cps < 12.0) {
+                return {
+                    emoji: '🚀',
+                    title: 'Hyper Speed',
+                    desc: 'Incredible jitter/butterfly clicking skills!'
+                };
+            } else if (cps < 15.0) {
+                return {
+                    emoji: '👑',
+                    title: 'Cyber God',
+                    desc: 'Pro-tier clicking god! Absolutely elite performance.'
+                };
+            } else {
+                return {
+                    emoji: '👾',
+                    title: 'Overclocked Entity',
+                    desc: 'Unreal speed! Are you even human or an autoclicker?'
+                };
+            }
+        }
+
+        // Finish Test Execution
+        function finishTest() {
+            clearInterval(timerInterval);
+            testState = 'finished';
+
+            const finalCPSNum = clickCount / selectedDuration;
+            const finalCPSStr = finalCPSNum.toFixed(2);
+
+            // Set final HUD display
+            timerDisplay.textContent = '0.0s';
+            cpsDisplay.textContent = finalCPSStr;
+            progressBar.style.width = '100%';
+
+            // Populate Modal Data
+            modalCps.textContent = finalCPSStr;
+            modalClicks.textContent = clickCount;
+            modalDuration.textContent = `${selectedDuration} Seconds`;
+
+            let typesText = 'Left Click';
+            if (allowLeftClick && allowRightClick) typesText = 'Left + Right';
+            else if (allowRightClick) typesText = 'Right Click';
+            modalTypes.textContent = typesText;
+
+            // Set Rank
+            const rank = getCPSRank(finalCPSNum);
+            rankEmoji.textContent = rank.emoji;
+            rankTitle.textContent = rank.title;
+            rankDesc.textContent = `"${rank.desc}"`;
+
+            // Display Modal
+            setTimeout(() => {
+                resultsModal.classList.remove('opacity-0', 'pointer-events-none');
+                resultsContent.classList.remove('scale-95');
+                resultsContent.classList.add('scale-100');
+            }, 150);
+        }
+
+        // Reset Test State
+        function resetTest() {
+            clearInterval(timerInterval);
+            testState = 'idle';
+            clickCount = 0;
+            startTime = null;
+
+            // Reset UI
+            timerDisplay.textContent = selectedDuration.toFixed(1) + 's';
+            clicksDisplay.textContent = '0';
+            cpsDisplay.textContent = '0.0';
+            progressBar.style.width = '0%';
+
+            clickPadTitle.textContent = 'Click Here To Start!';
+            clickPadSub.textContent = 'Test will start automatically on your first valid click inside this zone.';
+            clickIconContainer.classList.remove('border-cyan-400', 'scale-105');
+            clickPadPulse.classList.remove('opacity-100');
+
+            // Re-enable controls
+            leftClickCb.disabled = false;
+            rightClickCb.disabled = false;
+            durationBtns.forEach(b => b.classList.remove('opacity-50', 'cursor-not-allowed'));
+
+            // Hide Modal
+            resultsModal.classList.add('opacity-0', 'pointer-events-none');
+            resultsContent.classList.remove('scale-100');
+            resultsContent.classList.add('scale-95');
+        }
+
+        modalTryAgainBtn.addEventListener('click', () => {
+            resetTest();
+        });
+
+        // Share Result Clipboard Logic
+        modalShareBtn.addEventListener('click', () => {
+            const cpsVal = (clickCount / selectedDuration).toFixed(2);
+            const rankText = rankTitle.textContent;
+            const shareText = `⚡ I achieved ${cpsVal} CPS (${clickCount} clicks in ${selectedDuration}s) on CPS Speed Tester! Rank: ${rankText} ${rankEmoji.textContent}`;
+
+            // Robust fallback clipboard copy
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(shareText).then(showToast).catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+
+            function fallbackCopy() {
+                const textArea = document.createElement('textarea');
+                textArea.value = shareText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast();
+                } catch (err) {
+                    // Ignore copy failure
+                }
+                document.body.removeChild(textArea);
+            }
+
+            function showToast() {
+                shareToast.classList.remove('hidden');
+                setTimeout(() => {
+                    shareToast.classList.add('hidden');
+                }, 2000);
+            }
+        });
+
+        // Initialize default view
+        resetTest();
+    </script>
+</body>
+</html>
