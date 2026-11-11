@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Nexus - Advanced Platformer</title>
+    <style>
+        :root {
+            --primary: #4facfe;
+            --danger: #ff3333;
+            --success: #00ff66;
+            --bg-dark: #12121a;
+            --bg-panel: #1e1e2e;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            margin: 5px 0 15px 0;
+            font-size: 28px;
+            color: var(--primary);
+            text-shadow: 0 0 15px rgba(79, 172, 254, 0.6);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #game-wrapper {
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
+            border: 2px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #181824;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(18, 18, 26, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+
+        .overlay h2 {
+            font-size: 42px;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Legend and Controls */
+        #ui-bar {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        #legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            font-size: 13px;
+            background: var(--bg-panel);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 6px; color: #ccc; }
+        .color-box { width: 14px; height: 14px; border-radius: 3px; }
+        .controls { color: #888; font-size: 13px; text-align: center; font-weight: 500;}
+        .key { background: #333; padding: 2px 6px; border-radius: 4px; color: #fff; border-bottom: 2px solid #111;}
+    </style>
+</head>
+<body>
+
+    <h1>Gravity Nexus</h1>
+    
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="overlay">
+            <h2>System Ready</h2>
+            <button class="btn" onclick="startGame()">Initialize Simulation</button>
+        </div>
+
+        <!-- Win Screen -->
+        <div id="win-screen" class="overlay hidden">
+            <h2>Simulation Complete</h2>
+            <p style="margin-bottom: 30px; color: #aaa; font-size: 18px;">You have mastered the Nexus.</p>
+            <button class="btn" onclick="resetGame()">Restart Protocol</button>
+        </div>
+    </div>
+    
+    <div id="ui-bar">
+        <div id="legend">
+            <div class="legend-item"><div class="color-box" style="background:#4facfe;"></div> Player</div>
+            <div class="legend-item"><div class="color-box" style="background:#4a4a6a;"></div> Platform</div>
+            <div class="legend-item"><div class="color-box" style="background:#ff3333;"></div> Spikes</div>
+            <div class="legend-item"><div class="color-box" style="background:#00ff66;"></div> Jump Pad</div>
+            <div class="legend-item"><div class="color-box" style="background:#00ffff; border-radius:50%;"></div> Jump Orb</div>
+            <div class="legend-item"><div class="color-box" style="background:#9933ff; border-radius:50%;"></div> Gravity Orb</div>
+            <div class="legend-item"><div class="color-box" style="background:linear-gradient(45deg, #ffa500, #ff00ff);"></div> Portals</div>
+        </div>
+        <div class="controls">
+            Move: <span class="key">A</span> <span class="key">D</span> &nbsp;|&nbsp; 
+            Jump: <span class="key">W</span> or <span class="key">Space</span> (Hold for height) &nbsp;|&nbsp; 
+            Dash: <span class="key">E</span> &nbsp;|&nbsp; 
+            Wall Cling: <span class="key">Shift</span>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- GAME CONSTANTS ---
+    const GRAVITY = 0.55;
+    const TERMINAL_VELOCITY = 14;
+    const JUMP_FORCE = 10.5;
+    const BOOST_FORCE = 16;
+    const MOVE_SPEED = 5.5;
+    
+    // Dash constants
+    const DASH_SPEED = 16;
+    const DASH_DURATION = 12;
+    const DASH_COST = 25; // Cheaper stamina cost
+    const MAX_STAMINA = 100;
+    const DASH_COOLDOWN_MAX = 45; // Frames before dash can be used again
+    
+    // Wall jump constants
+    const WALL_JUMP_FORCE_Y = 9.5;
+    const WALL_JUMP_FORCE_X = 8.5;
+    const WALL_JUMP_LOCKOUT = 15; // Prevents holding towards wall immediately after wall jump
+    const WALL_SLIDE_SPEED = 2.5;
+
+    // --- GAME STATE ---
+    let gameState = 'START'; // START, PLAYING, WIN
+    let currentGravityDir = 1; // 1 = normal, -1 = inverted
+    let currentLevel = 1;
+    const MAX_LEVELS = 6;
+    
+    const keys = {
+        left: false, right: false, jump: false, jumpProcessed: false,
+        dash: false, dashProcessed: false, cling: false
+    };
+
+    // --- ENTITIES ---
+    const player = {
+        spawnX: 50, spawnY: 500,
+        x: 50, y: 500,
+        width: 22, height: 22,
+        vx: 0, vy: 0,
+        isGrounded: false,
+        canDoubleJump: false,
+        portalCooldown: 0,
+        color: '#4facfe',
+        
+        // Abilities
+        stamina: MAX_STAMINA,
+        isDashing: false,
+        dashTimer: 0,
+        dashCooldown: 0,
+        lastFacingDir: 1, // 1: right, -1: left
+        
+        // Wall mechanics
+        wallDir: 0, // -1: wall left, 1: wall right, 0: none
+        wallJumpTimer: 0 // Lockout timer
+    };
+
+    const platforms = [];
+    const spikes = [];
+    const jumpOrbs = [];
+    const gravityOrbs = [];
+    const portals = [];
+    let goal = { x: -100, y: -100, w: 40, h: 40, color: '#00ff66' };
+
+    // --- INPUT HANDLING ---
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Space') keys.jump = true;
+        if (e.code === 'KeyE') keys.dash = true;
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.cling = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        if (e.code === 'KeyE') { keys.dash = false; keys.dashProcessed = false; }
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.cling = false;
+        
+        // Variable Jump Height logic
+        if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Space') {
+            keys.jump = false;
+            keys.jumpProcessed = false;
+            // If moving against gravity (upward normally, downward inverted) and jump released -> cut velocity
+            if (!player.isGrounded && player.vy * currentGravityDir < 0) {
+                player.vy *= 0.4; 
+            }
+        }
+    });
+
+    // --- LEVEL DESIGN ---
+    function buildLevel(levelNum) {
+        platforms.length = 0; spikes.length = 0; jumpOrbs.length = 0;
+        gravityOrbs.length = 0; portals.length = 0;
+        currentGravityDir = 1;
+
+        // Boundaries
+        platforms.push({ x: 0, y: 0, w: 800, h: 20, type: 'solid' }); // Ceiling
+        platforms.push({ x: 0, y: 0, w: 20, h: 600, type: 'solid' }); // Left Wall
+        platforms.push({ x: 780, y: 0, w: 20, h: 600, type: 'solid' }); // Right Wall
+        platforms.push({ x: 0, y: 580, w: 800, h: 20, type: 'solid' }); // Floor
+
+        const setSpawn = (x, y) => { player.spawnX = x; player.spawnY = y; };
+
+        switch(levelNum) {
+            case 1: // The Basics
+                setSpawn(50, 500);
+                platforms.push({ x: 250, y: 480, w: 100, h: 20, type: 'solid' });
+                platforms.push({ x: 450, y: 380, w: 100, h: 20, type: 'solid' });
+                spikes.push({ x: 200, y: 565, w: 400, h: 15, invert: false }); // Ground spikes
+                goal = { x: 700, y: 540, w: 40, h: 40, color: '#00ff66' };
+                break;
+
+            case 2: // The Dash (Cooldown intro)
+                setSpawn(50, 200);
+                platforms.push({ x: 20, y: 250, w: 150, h: 20, type: 'solid' });
+                spikes.push({ x: 170, y: 565, w: 500, h: 15, invert: false }); // Massive pit
+                
+                // Platforms spaced out requiring dashes
+                platforms.push({ x: 300, y: 350, w: 50, h: 20, type: 'solid' });
+                platforms.push({ x: 500, y: 450, w: 50, h: 20, type: 'solid' });
+                
+                goal = { x: 700, y: 540, w: 40, h: 40, color: '#00ff66' };
+                break;
+
+            case 3: // Wall Jump Fix Check
+                setSpawn(50, 500);
+                // Chimney climb
+                platforms.push({ x: 200, y: 150, w: 30, h: 430, type: 'solid' });
+                platforms.push({ x: 350, y: 20, w: 30, h: 480, type: 'solid' });
+                
+                spikes.push({ x: 230, y: 565, w: 120, h: 15, invert: false }); // Lava in chimney
+                
+                goal = { x: 250, y: 50, w: 40, h: 40, color: '#00ff66' };
+                break;
+
+            case 4: // Orbs & Pads
+                setSpawn(50, 500);
+                // Pad
+                platforms.push({ x: 200, y: 560, w: 60, h: 20, type: 'jumpPad' });
+                
+                // Double jump orb chain
+                jumpOrbs.push({ x: 350, y: 300, r: 10, active: true, cooldown: 0 });
+                jumpOrbs.push({ x: 500, y: 200, r: 10, active: true, cooldown: 0 });
+                
+                platforms.push({ x: 650, y: 150, w: 100, h: 20, type: 'solid' });
+                goal = { x: 700, y: 110, w: 40, h: 40, color: '#00ff66' };
+                break;
+
+            case 5: // Gravity Flip
+                setSpawn(50, 500);
+                // Gravity Orb
+                gravityOrbs.push({ x: 200, y: 400, r: 14, active: true, cooldown: 0 });
+                
+                // Ceiling path
+                platforms.push({ x: 300, y: 100, w: 300, h: 20, type: 'solid' });
+                spikes.push({ x: 350, y: 120, w: 50, h: 15, invert: true }); // Spikes on ceiling
+                spikes.push({ x: 450, y: 120, w: 50, h: 15, invert: true }); 
+                
+                // Flip back to ground
+                gravityOrbs.push({ x: 650, y: 200, r: 14, active: true, cooldown: 0 });
+                
+                goal = { x: 700, y: 540, w: 40, h: 40, color: '#00ff66' };
+                break;
+
+            case 6: // Portals & Moving Platforms (The Gauntlet)
+                setSpawn(50, 500);
+                
+                // Portal Entrance
+                portals.push({ id: 'P1', x: 120, y: 450, w: 30, h: 40, targetId: 'P2', color: '#ff00ff' });
+                
+                // Portal Exit in mid-air
+                portals.push({ id: 'P2', x: 400, y: 100, w: 30, h: 40, targetId: null, color: '#ff00ff' });
+                
+                // Moving Platform to catch you
+                platforms.push({ 
+                    x: 350, y: 250, w: 80, h: 15, type: 'moving', 
+                    vx: 2.5, vy: 0, startX: 300, endX: 600 
+                });
+                
+                // Death floor
+                spikes.push({ x: 200, y: 565, w: 580, h: 15, invert: false });
+                
+                // Final tricky wall jump
+                platforms.push({ x: 700, y: 350, w: 20, h: 150, type: 'solid' });
+                platforms.push({ x: 600, y: 150, w: 20, h: 150, type: 'solid' });
+                
+                goal = { x: 720, y: 200, w: 40, h: 40, color: '#00ff66' };
+                break;
+        }
+    }
+
+    // --- GAME ENGINE LOGIC ---
+
+    function resetPlayer() {
+        player.x = player.spawnX; player.y = player.spawnY;
+        player.vx = 0; player.vy = 0;
+        currentGravityDir = 1;
+        player.isGrounded = false; player.canDoubleJump = false;
+        player.portalCooldown = 0;
+        player.isDashing = false; player.dashTimer = 0; player.dashCooldown = 0;
+        player.stamina = MAX_STAMINA; player.wallJumpTimer = 0;
+        keys.jumpProcessed = true; // Prevent insta-jump on respawn
+    }
+
+    function startGame() {
+        document.getElementById('start-screen').classList.add('hidden');
+        gameState = 'PLAYING';
+        currentLevel = 1;
+        buildLevel(currentLevel);
+        resetPlayer();
+    }
+
+    function resetGame() {
+        document.getElementById('win-screen').classList.add('hidden');
+        startGame();
+    }
+
+    function checkRectCollision(r1, r2) {
+        return ( r1.x < r2.x + (r2.w || r2.width) && r1.x + r1.width > r2.x &&
+                 r1.y < r2.y + (r2.h || r2.height) && r1.y + r1.height > r2.y );
+    }
+
+    function checkCircleCollision(circle, rect) {
+        let testX = circle.x; let testY = circle.y;
+        if (circle.x < rect.x) testX = rect.x; else if (circle.x > rect.x + rect.width) testX = rect.x + rect.width;
+        if (circle.y < rect.y) testY = rect.y; else if (circle.y > rect.y + rect.height) testY = rect.y + rect.height;
+        let distX = circle.x - testX; let distY = circle.y - testY;
+        return (distX*distX + distY*distY) <= (circle.r * circle.r);
+    }
+
+    function update() {
+        if (gameState !== 'PLAYING') return;
+
+        // Timers & Cooldowns
+        if (player.portalCooldown > 0) player.portalCooldown--;
+        if (player.dashCooldown > 0) player.dashCooldown--;
+        if (player.wallJumpTimer > 0) player.wallJumpTimer--;
+        
+        // Stamina Regen
+        if (!player.isDashing && player.dashCooldown <= 0) {
+            player.stamina = Math.min(MAX_STAMINA, player.stamina + 0.5);
+        }
+
+        // --- DASH LOGIC ---
+        if (keys.dash && !keys.dashProcessed && player.dashCooldown === 0 && player.stamina >= DASH_COST && !player.isDashing) {
+            player.isDashing = true;
+            player.dashTimer = DASH_DURATION;
+            player.stamina -= DASH_COST;
+            player.vy = 0; // Freeze Y during dash
+            keys.dashProcessed = true;
+        }
+
+        if (player.isDashing) {
+            player.dashTimer--;
+            if (player.dashTimer <= 0) {
+                player.isDashing = false;
+                player.dashCooldown = DASH_COOLDOWN_MAX; // Trigger cooldown
+            }
+        }
+
+        // --- MOVING PLATFORMS ---
+        let platformVelocityX = 0; let platformVelocityY = 0;
+        platforms.forEach(p => {
+            if (p.type === 'moving') {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x > p.endX || p.x < p.startX) p.vx *= -1;
+            }
+        });
+
+        // --- X-AXIS MOVEMENT ---
+        if (player.isDashing) {
+            player.vx = player.lastFacingDir * DASH_SPEED;
+        } else if (player.wallJumpTimer > 0) {
+            // Air control heavily reduced during lockout to force pushback
+            // vx is preserved from the wall jump impulse
+        } else {
+            if (keys.left) { player.vx = -MOVE_SPEED; player.lastFacingDir = -1; }
+            else if (keys.right) { player.vx = MOVE_SPEED; player.lastFacingDir = 1; }
+            else { player.vx = 0; }
+        }
+
+        player.x += player.vx;
+        player.wallDir = 0; // Reset wall contact state
+
+        // Robust AABB - X Axis Collision
+        platforms.forEach(p => {
+            if (checkRectCollision(player, p)) {
+                if (player.vx > 0) {
+                    player.x = p.x - player.width; // Snap left
+                    player.wallDir = 1;
+                } else if (player.vx < 0) {
+                    player.x = p.x + p.w; // Snap right
+                    player.wallDir = -1;
+                }
+                player.vx = 0;
+                if (player.isDashing) { player.isDashing = false; player.dashCooldown = DASH_COOLDOWN_MAX; }
+            }
+        });
+
+        // --- Y-AXIS MOVEMENT & GRAVITY ---
+        let isWallSliding = (player.wallDir !== 0 && keys.cling && !player.isGrounded && player.vy * currentGravityDir > 0);
+        
+        if (!player.isDashing) {
+            player.vy += GRAVITY * currentGravityDir;
+            
+            // Wall slide friction
+            if (isWallSliding) {
+                if (Math.abs(player.vy) > WALL_SLIDE_SPEED) {
+                    player.vy = WALL_SLIDE_SPEED * currentGravityDir;
+                }
+            } else {
+                if (player.vy > TERMINAL_VELOCITY) player.vy = TERMINAL_VELOCITY;
+                if (player.vy < -TERMINAL_VELOCITY) player.vy = -TERMINAL_VELOCITY;
+            }
+        }
+
+        // -- JUMPING --
+        if (keys.jump && !keys.jumpProcessed) {
+            if (player.isGrounded) { // Normal Jump
+                player.vy = -JUMP_FORCE * currentGravityDir;
+                player.isGrounded = false;
+                keys.jumpProcessed = true;
+            } 
+            else if (isWallSliding || player.wallDir !== 0) { // Wall Jump Fix
+                player.vy = -WALL_JUMP_FORCE_Y * currentGravityDir;
+                player.vx = -player.wallDir * WALL_JUMP_FORCE_X; // Force away from wall
+                player.wallJumpTimer = WALL_JUMP_LOCKOUT; // Apply lockout to prevent immediate re-cling
+                
+                player.isGrounded = false;
+                player.canDoubleJump = true; // Wall jumps grant double jump!
+                keys.jumpProcessed = true;
+            } 
+            else if (player.canDoubleJump) { // Double Jump
+                player.vy = -JUMP_FORCE * currentGravityDir;
+                player.canDoubleJump = false;
+                keys.jumpProcessed = true;
+            }
+        }
+
+        player.y += player.vy;
+        player.isGrounded = false;
+
+        // Robust AABB - Y Axis Collision
+        platforms.forEach(p => {
+            if (checkRectCollision(player, p)) {
+                if (player.vy > 0) { // Falling Down
+                    player.y = p.y - player.height;
+                    player.vy = 0;
+                    if (currentGravityDir === 1) { player.isGrounded = true; player.canDoubleJump = false; }
+                    
+                    if (p.type === 'moving') { platformVelocityX = p.vx; platformVelocityY = p.vy; }
+                    if (p.type === 'jumpPad' && currentGravityDir === 1) {
+                        player.vy = -BOOST_FORCE; player.isGrounded = false;
+                    }
+                } 
+                else if (player.vy < 0) { // Falling Up / Hitting Head
+                    player.y = p.y + p.h;
+                    player.vy = 0;
+                    if (currentGravityDir === -1) { player.isGrounded = true; player.canDoubleJump = false; }
+                    
+                    if (p.type === 'jumpPad' && currentGravityDir === -1) {
+                        player.vy = BOOST_FORCE; player.isGrounded = false;
+                    }
+                }
+            }
+        });
+
+        // Apply moving platform velocity
+        if (player.isGrounded) {
+            player.x += platformVelocityX;
+            player.y += platformVelocityY;
+        }
+
+        // --- HAZARDS & INTERACTABLES ---
+        spikes.forEach(s => {
+            // Shrink spike hitbox slightly for fairness
+            let hitbox = { x: s.x + 2, y: s.invert ? s.y : s.y + 5, w: s.w - 4, h: s.h - 5 };
+            if (checkRectCollision(player, hitbox)) resetPlayer();
+        });
+
+        jumpOrbs.forEach(orb => {
+            if (!orb.active) { if (--orb.cooldown <= 0) orb.active = true; }
+            else if (checkCircleCollision(orb, player)) {
+                player.canDoubleJump = true; orb.active = false; orb.cooldown = 150;
+            }
+        });
+
+        gravityOrbs.forEach(orb => {
+            if (!orb.active) { if (--orb.cooldown <= 0) orb.active = true; }
+            else if (checkCircleCollision(orb, player)) {
+                currentGravityDir *= -1; player.vy = 0; orb.active = false; orb.cooldown = 180;
+            }
+        });
+
+        if (player.portalCooldown <= 0) {
+            portals.forEach(portal => {
+                if (checkRectCollision(player, portal)) {
+                    if (portal.targetId) {
+                        let target = portals.find(p => p.id === portal.targetId);
+                        if (target) {
+                            player.x = target.x + (target.w / 2) - (player.width / 2);
+                            player.y = target.y + target.h - player.height;
+                            player.portalCooldown = 40;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Level Complete
+        if (checkRectCollision(player, goal)) {
+            currentLevel++;
+            if (currentLevel > MAX_LEVELS) {
+                gameState = 'WIN';
+                document.getElementById('win-screen').classList.remove('hidden');
+            } else {
+                buildLevel(currentLevel);
+                resetPlayer();
+            }
+        }
+        
+        // Out of bounds safety
+        if (player.y > 800 || player.y < -200) resetPlayer();
+    }
+
+    // --- RENDERING ---
+    function draw() {
+        // Background
+        ctx.fillStyle = '#181824';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Grid pattern
+        ctx.strokeStyle = '#252535';
+        ctx.lineWidth = 1;
+        for(let i=0; i<800; i+=40) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke();
+        }
+
+        // Goal
+        ctx.fillStyle = goal.color;
+        ctx.shadowBlur = 15; ctx.shadowColor = goal.color;
+        ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 150) * 0.3;
+        ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
+        ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
+
+        // Platforms
+        platforms.forEach(p => {
+            if (p.type === 'jumpPad') {
+                ctx.fillStyle = '#00ff66';
+                ctx.fillRect(p.x, p.y + (currentGravityDir === 1 ? p.h - 5 : 0), p.w, 5); // Pad visual
+                ctx.fillStyle = '#333';
+                ctx.fillRect(p.x, p.y + (currentGravityDir === 1 ? 0 : 5), p.w, p.h - 5);
+            } else if (p.type === 'moving') {
+                ctx.fillStyle = '#6a6a8a';
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+            } else {
+                ctx.fillStyle = '#4a4a6a';
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+                // Highlight edge
+                ctx.fillStyle = '#5a5a7a';
+                ctx.fillRect(p.x, p.y, p.w, 2);
+            }
+        });
+
+        // Spikes
+        ctx.fillStyle = '#ff3333';
+        spikes.forEach(s => {
+            ctx.beginPath();
+            let numSpikes = Math.floor(s.w / 10);
+            let spikeW = s.w / numSpikes;
+            for(let i=0; i<numSpikes; i++) {
+                let px = s.x + (i * spikeW);
+                if (s.invert) {
+                    ctx.moveTo(px, s.y); ctx.lineTo(px + spikeW, s.y); ctx.lineTo(px + spikeW/2, s.y + s.h);
+                } else {
+                    ctx.moveTo(px, s.y + s.h); ctx.lineTo(px + spikeW/2, s.y); ctx.lineTo(px + spikeW, s.y + s.h);
+                }
+            }
+            ctx.fill();
+        });
+
+        // Portals
+        portals.forEach(portal => {
+            let gradient = ctx.createLinearGradient(portal.x, portal.y, portal.x + portal.w, portal.y + portal.h);
+            gradient.addColorStop(0, '#ffa500'); gradient.addColorStop(1, '#ff00ff');
+            ctx.fillStyle = gradient;
+            ctx.globalAlpha = 0.8;
+            ctx.fillRect(portal.x, portal.y, portal.w, portal.h);
+            ctx.globalAlpha = 1.0;
+        });
+
+        // Orbs
+        jumpOrbs.forEach(orb => {
+            ctx.fillStyle = orb.active ? '#00ffff' : 'rgba(0, 255, 255, 0.15)';
+            ctx.beginPath(); ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2); ctx.fill();
+            if (orb.active) { ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.stroke(); ctx.shadowBlur = 0; }
+        });
+
+        gravityOrbs.forEach(orb => {
+            ctx.fillStyle = orb.active ? '#9933ff' : 'rgba(153, 51, 255, 0.15)';
+            ctx.beginPath(); ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2); ctx.fill();
+            if (orb.active) { 
+                ctx.shadowBlur = 15; ctx.shadowColor = '#9933ff'; ctx.stroke(); ctx.shadowBlur = 0; 
+                ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('G', orb.x, orb.y);
+            }
+        });
+
+        // Player
+        ctx.fillStyle = player.color;
+        if (currentGravityDir === -1) { ctx.shadowBlur = 15; ctx.shadowColor = '#9933ff'; }
+        if (player.isDashing) { ctx.shadowBlur = 20; ctx.shadowColor = '#4facfe'; }
+        
+        if (player.canDoubleJump) {
+            ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 2;
+            ctx.strokeRect(player.x - 2, player.y - 2, player.width + 4, player.height + 4);
+        }
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.shadowBlur = 0; 
+        
+        // Eye direction indicator
+        ctx.fillStyle = '#fff';
+        let eyeX = player.lastFacingDir === 1 ? player.x + player.width - 6 : player.x + 2;
+        let eyeY = currentGravityDir === 1 ? player.y + 4 : player.y + player.height - 8;
+        ctx.fillRect(eyeX, eyeY, 4, 4);
+
+        // --- UI DRAWING ---
+        // Level Text
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 22px "Segoe UI"'; ctx.textAlign = 'left';
+        ctx.fillText(`LEVEL: ${currentLevel} / ${MAX_LEVELS}`, 20, 35);
+
+        // Stamina Bar background
+        ctx.fillStyle = '#333'; ctx.fillRect(20, 50, 150, 12);
+        
+        // Stamina Fill
+        let stamRatio = player.stamina / MAX_STAMINA;
+        let stamColor = (player.dashCooldown > 0) ? '#ff5555' : (player.stamina >= DASH_COST ? '#00ff66' : '#ffaa00');
+        ctx.fillStyle = stamColor;
+        ctx.fillRect(20, 50, 150 * stamRatio, 12);
+        
+        // Stamina border & dash cost notches
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(20, 50, 150, 12);
+        let numDashes = MAX_STAMINA / DASH_COST;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        for(let i=1; i<numDashes; i++) {
+            let nx = 20 + (150 * (i * DASH_COST / MAX_STAMINA));
+            ctx.beginPath(); ctx.moveTo(nx, 50); ctx.lineTo(nx, 62); ctx.stroke();
+        }
+
+        // Dash Cooldown Indicator text
+        ctx.font = '12px "Segoe UI"';
+        if (player.dashCooldown > 0) {
+            ctx.fillStyle = '#ff5555';
+            ctx.fillText('DASH COOLDOWN', 20, 78);
+        } else if (player.stamina >= DASH_COST) {
+            ctx.fillStyle = '#4facfe';
+            ctx.fillText('DASH READY [E]', 20, 78);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initial render call
+    draw();
+    requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

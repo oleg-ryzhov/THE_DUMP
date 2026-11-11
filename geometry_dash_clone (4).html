@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Geometry Dash Neon Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Righteous&family=Teko:wght@600;700&display=swap');
+        
+        body {
+            background-color: #030712;
+            color: #fff;
+            font-family: 'Righteous', cursive, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        .gd-text-glow {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.7), 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+
+        .gd-button {
+            transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+            pointer-events: auto !important;
+            cursor: pointer;
+        }
+        
+        .gd-button:hover {
+            transform: translateY(-2px) scale(1.03);
+            filter: brightness(1.15);
+        }
+
+        .gd-button:active {
+            transform: translateY(2px) scale(0.98);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .color-swatch {
+            pointer-events: auto !important;
+            cursor: pointer;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00f0ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-black flex items-center justify-center min-h-screen">
+
+    <div id="game-container" class="relative w-full h-full overflow-hidden">
+        <!-- Canvas Element -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Dynamic UI Overlay -->
+        <div id="ui-overlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-6 z-10">
+            <!-- Top HUD Bar -->
+            <div class="flex justify-between items-center w-full">
+                <!-- Level Info & Attempt Status -->
+                <div class="flex flex-col gap-1">
+                    <div id="level-title-banner" class="text-xs md:text-sm text-cyan-300 tracking-widest font-bold uppercase">
+                        LEVEL 1: STEREO MADNESS
+                    </div>
+                    <div id="attempt-banner" class="text-xl md:text-2xl font-bold tracking-wider text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                        ATTEMPT 1
+                    </div>
+                    <div id="practice-status" class="hidden text-xs bg-purple-900/80 text-purple-200 border border-purple-400 px-3 py-1 rounded-full backdrop-blur-md self-start font-sans font-semibold">
+                        PRACTICE MODE (Z: Checkpoint | X: Delete)
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-1/3 max-w-md bg-gray-900/80 border-2 border-cyan-500/50 rounded-full h-6 p-0.5 backdrop-blur-sm relative overflow-hidden shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+                    <div id="progress-bar-inner" class="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 h-full rounded-full w-0% transition-all duration-75"></div>
+                    <span id="progress-text" class="absolute inset-0 flex items-center justify-center text-xs md:text-sm font-black tracking-widest drop-shadow">0%</span>
+                </div>
+
+                <!-- Pause Button -->
+                <button id="pause-btn" class="pointer-events-auto gd-button bg-cyan-600 hover:bg-cyan-500 text-white font-bold p-3 rounded-2xl border-2 border-cyan-300 shadow-lg">
+                    <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+            </div>
+
+            <!-- Practice Controls (Touch Device Friendly) -->
+            <div id="touch-practice-controls" class="hidden pointer-events-auto flex gap-3 self-center mb-2">
+                <button id="btn-checkpoint" class="gd-button bg-green-600 border border-green-300 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md">
+                    + Checkpoint (Z)
+                </button>
+                <button id="btn-remove-checkpoint" class="gd-button bg-red-600 border border-red-300 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md">
+                    - Delete (X)
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Menu Overlay -->
+        <div id="main-menu" class="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-purple-950/80 to-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 gap-6 z-20 pointer-events-auto">
+            <div class="text-center">
+                <h1 class="text-5xl md:text-7xl font-extrabold italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-yellow-400 gd-text-glow transform -rotate-2">
+                    GEOMETRY DASH
+                </h1>
+                <p class="text-cyan-300 text-lg md:text-xl font-medium tracking-widest mt-1 uppercase">Neon Edition</p>
+            </div>
+
+            <!-- Level Selector Carousel -->
+            <div class="flex items-center gap-4 bg-slate-900/80 border-2 border-cyan-500/50 p-4 rounded-3xl max-w-lg w-full justify-between shadow-[0_0_30px_rgba(0,240,255,0.2)]">
+                <button id="btn-prev-level" class="gd-button bg-slate-800 text-cyan-400 hover:text-white p-3 rounded-2xl border border-cyan-500/40 text-2xl font-black">
+                    &#9664;
+                </button>
+                <div class="text-center flex-1">
+                    <div id="select-level-name" class="text-2xl font-black text-yellow-300 tracking-wide">1. STEREO MADNESS</div>
+                    <div id="select-level-diff" class="text-sm font-bold text-emerald-400 mt-1">EASY • Speed: 5.5</div>
+                    <div id="select-level-best" class="text-xs text-gray-400 mt-1">Best Progress: 0%</div>
+                </div>
+                <button id="btn-next-level" class="gd-button bg-slate-800 text-cyan-400 hover:text-white p-3 rounded-2xl border border-cyan-500/40 text-2xl font-black">
+                    &#9654;
+                </button>
+            </div>
+
+            <!-- Center Menu Options -->
+        <div class="flex flex-col sm:flex-row gap-6 items-center">
+            <button id="btn-play-normal" class="pointer-events-auto gd-button w-48 py-4 bg-emerald-500 border-4 border-emerald-200 rounded-3xl text-2xl font-black tracking-wider text-white shadow-[0_0_25px_rgba(16,185,129,0.5)]">
+                NORMAL
+            </button>
+            <button id="btn-play-practice" class="pointer-events-auto gd-button w-48 py-4 bg-purple-600 border-4 border-purple-200 rounded-3xl text-2xl font-black tracking-wider text-white shadow-[0_0_25px_rgba(147,51,234,0.5)]">
+                PRACTICE
+            </button>
+            <button id="btn-customize" class="pointer-events-auto gd-button w-48 py-4 bg-cyan-600 border-4 border-cyan-200 rounded-3xl text-2xl font-black tracking-wider text-white shadow-[0_0_25px_rgba(6,182,212,0.5)]">
+                CUSTOMIZE
+            </button>
+        </div>
+
+        <!-- Level Select Drawer -->
+        <div id="level-select-box" class="w-full max-w-xl bg-slate-900/90 border border-cyan-500/40 rounded-3xl p-4 backdrop-blur-md flex flex-col items-center gap-3">
+            <div class="flex items-center justify-between w-full px-4">
+                <button id="btn-prev-level" class="pointer-events-auto gd-button bg-slate-800 text-cyan-300 border border-cyan-400 p-3 rounded-2xl text-xl font-black">◀</button>
+                <div class="text-center">
+                    <div id="level-title-display" class="text-2xl font-black text-yellow-300 tracking-wider">1. STEREO MADNESS</div>
+                    <div id="level-diff-display" class="text-sm font-bold text-cyan-400">DIFFICULTY: EASY | SPEED: 5.2x</div>
+                </div>
+                <button id="btn-next-level" class="pointer-events-auto gd-button bg-slate-800 text-cyan-300 border border-cyan-400 p-3 rounded-2xl text-xl font-black">▶</button>
+            </div>
+        </div>
+
+        <!-- Controls Info Box -->
+            <div class="bg-black/40 border border-cyan-500/30 rounded-2xl p-4 max-w-lg w-full text-center text-xs md:text-sm text-cyan-200/80 space-y-1 backdrop-blur-sm">
+                <p><span class="text-yellow-400 font-bold">CLICK / SPACE / UP ARROW</span> - Jump / Fly / Gravity / Orb Action</p>
+                <p><span class="text-purple-400 font-bold">Z</span> - Place Practice Checkpoint | <span class="text-red-400 font-bold">X</span> - Delete Checkpoint</p>
+                <p><span class="text-cyan-400 font-bold">P / ESC</span> - Pause Game</p>
+            </div>
+        </div>
+
+        <!-- Customizer Modal -->
+        <div id="customizer-modal" class="hidden absolute inset-0 bg-black/95 backdrop-blur-lg z-30 flex flex-col items-center justify-center p-6 gap-6 pointer-events-auto">
+            <h2 class="text-3xl md:text-4xl font-extrabold text-cyan-400 tracking-wider">ICON CUSTOMIZER</h2>
+            
+            <!-- Live Preview Canvas Box -->
+            <div class="relative w-32 h-32 bg-slate-900 border-4 border-cyan-400 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+                <canvas id="previewCanvas" width="80" height="80"></canvas>
+            </div>
+
+            <!-- Customization Controls -->
+            <div class="w-full max-w-md space-y-4 bg-slate-900/80 p-6 rounded-2xl border border-white/10">
+                <div>
+                    <label class="block text-sm font-bold text-gray-300 mb-2">Primary Color</label>
+                    <div id="primary-color-picker" class="flex gap-3 justify-center"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-300 mb-2">Secondary Color</label>
+                    <div id="secondary-color-picker" class="flex gap-3 justify-center"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-300 mb-2">Trail Effect</label>
+                    <select id="trail-select" class="pointer-events-auto w-full bg-slate-800 border border-cyan-500/50 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-400">
+                        <option value="neon">Neon Rainbow</option>
+                        <option value="fire">Inferno Fire</option>
+                        <option value="cyan">Quantum Blue</option>
+                        <option value="ghost">Ghost Trail</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="btn-customizer-back" class="gd-button bg-cyan-600 border-2 border-cyan-300 text-white font-bold px-8 py-3 rounded-2xl text-lg">
+                SAVE & BACK
+            </button>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 gap-6 pointer-events-auto">
+            <h2 class="text-4xl font-black text-yellow-400 tracking-wider">PAUSED</h2>
+            <div class="flex flex-col gap-4 w-64">
+                <button id="btn-resume" class="gd-button bg-emerald-600 border-2 border-emerald-300 text-white font-bold py-3 rounded-2xl text-xl">RESUME</button>
+                <button id="btn-restart" class="gd-button bg-yellow-600 border-2 border-yellow-300 text-white font-bold py-3 rounded-2xl text-xl">RESTART</button>
+                <button id="btn-exit" class="gd-button bg-red-600 border-2 border-red-300 text-white font-bold py-3 rounded-2xl text-xl">MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- Victory Modal -->
+        <div id="victory-modal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md z-40 flex flex-col items-center justify-center p-6 gap-6 pointer-events-auto">
+            <h2 class="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 gd-text-glow animate-bounce">LEVEL COMPLETE!</h2>
+            
+            <div class="bg-slate-900 border-2 border-yellow-400/50 p-6 rounded-3xl w-full max-w-md text-center space-y-4 shadow-[0_0_40px_rgba(234,179,8,0.3)]">
+                <div class="text-2xl font-bold text-cyan-300" id="victory-attempts">Attempts: 1</div>
+                <div class="flex justify-center gap-4 text-4xl text-yellow-400">
+                    <span>★</span><span>★</span><span>★</span>
+                </div>
+                <div id="victory-level-name" class="text-gray-400 text-sm">Level: Stereo Madness (100%)</div>
+            </div>
+
+            <button id="btn-victory-menu" class="gd-button bg-yellow-500 border-2 border-yellow-200 text-slate-950 font-black px-10 py-4 rounded-3xl text-2xl shadow-lg">
+                CONTINUE
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* --- SOUND SYNTHESIZER (Web Audio API) --- */
+        class AudioSynth {
+            constructor() {
+                this.ctx = null;
+                this.isPlayingMusic = false;
+                this.bpm = 130;
+                this.step = 0;
+                this.musicTimer = null;
+                this.pitchMultiplier = 1;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playJump() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(480, this.ctx.currentTime + 0.12);
+                
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playOrb() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, this.ctx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playGravity() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(110, this.ctx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playPortal() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playDeath() {
+                if (!this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * 0.25;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+                filter.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.25);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            }
+
+            playVictory() {
+                if (!this.ctx) return;
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    
+                    const startTime = this.ctx.currentTime + idx * 0.12;
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.setValueAtTime(0.3, startTime + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.4);
+                });
+            }
+
+            startMusic(bpm = 130, pitchMult = 1.0) {
+                this.init();
+                this.stopMusic();
+                this.bpm = bpm;
+                this.pitchMultiplier = pitchMult;
+                this.isPlayingMusic = true;
+                this.step = 0;
+                
+                const interval = (60 / this.bpm / 4) * 1000;
+                this.musicTimer = setInterval(() => this.tickMusic(), interval);
+            }
+
+            stopMusic() {
+                this.isPlayingMusic = false;
+                if (this.musicTimer) clearInterval(this.musicTimer);
+            }
+
+            tickMusic() {
+                if (!this.isPlayingMusic || !this.ctx) return;
+                const time = this.ctx.currentTime;
+                
+                if (this.step % 4 === 0) {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(130 * this.pitchMultiplier, time);
+                    osc.frequency.exponentialRampToValueAtTime(30, time + 0.08);
+                    gain.gain.setValueAtTime(0.35, time);
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(time);
+                    osc.stop(time + 0.08);
+                }
+
+                const bassNotes = [110, 110, 130.81, 110, 146.83, 110, 130.81, 98];
+                const note = bassNotes[this.step % bassNotes.length] * this.pitchMultiplier;
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(note, time);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(350 + (this.step % 8) * 90, time);
+
+                gain.gain.setValueAtTime(0.1, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.09);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(time);
+                osc.stop(time + 0.09);
+
+                this.step = (this.step + 1) % 32;
+            }
+        }
+
+        const audio = new AudioSynth();
+
+        /* --- GLOBAL CONSTANTS & CONFIG --- */
+        const TILE_SIZE = 40;
+        const GRAVITY_BASE = 1.35;
+
+        // Customization State
+        const customization = {
+            primary: '#00f0ff',
+            secondary: '#ff0077',
+            trail: 'neon'
+        };
+
+        const COLOR_PALETTES = [
+            '#00f0ff', '#ff0077', '#00ff66', '#ffaa00', '#aa00ff', '#ffffff', '#ff3333'
+        ];
+
+        /* --- 10 HANDCRAFTED UNIQUE LEVELS WITH ANTI-CHEESE CEILINGS --- */
+        const LEVEL_DEFINITIONS = [
+            { name: "1. STEREO MADNESS", diff: "EASY", speed: 5.5, bg: "#06101e", pitch: 110 },
+            { name: "2. BACK ON TRACK", diff: "EASY", speed: 5.8, bg: "#081d0f", pitch: 125 },
+            { name: "3. POLARGEIST", diff: "NORMAL", speed: 6.0, bg: "#1e0b25", pitch: 140 },
+            { name: "4. DRY OUT", diff: "NORMAL", speed: 6.2, bg: "#251206", pitch: 155 },
+            { name: "5. BASE AFTER BASE", diff: "HARD", speed: 6.5, bg: "#0b1c24", pitch: 170 },
+            { name: "6. CAN'T LET GO", diff: "HARD", speed: 6.7, bg: "#240b0b", pitch: 185 },
+            { name: "7. JUMPER", diff: "HARDER", speed: 7.0, bg: "#1c1c08", pitch: 200 },
+            { name: "8. TIME MACHINE", diff: "HARDER", speed: 7.2, bg: "#210924", pitch: 215 },
+            { name: "9. CYCLES", diff: "INSANE", speed: 7.5, bg: "#042024", pitch: 230 },
+            { name: "10. GEOMETRY CHAOS", diff: "DEMON", speed: 7.8, bg: "#29041b", pitch: 250 }
+        ];
+
+        function createLevelData(levelIndex) {
+            const level = [];
+            const addBlock = (x, y) => level.push({ type: 1, x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE });
+            const addSpike = (x, y) => level.push({ type: 2, x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE });
+            const addOrb = (type, x, y) => level.push({ type, x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE });
+            const addPad = (type, x, y) => level.push({ type, x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE / 4 });
+            const addPortal = (type, x, y) => level.push({ type, x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE * 1.2, h: TILE_SIZE * 2.5 });
+
+            const GROUND_Y = 10;
+            const TOTAL_LENGTH_TILES = 220 + levelIndex * 15;
+
+            // Anti-Cheese Base Ground & Top Ceiling Barrier
+            for (let x = 0; x < TOTAL_LENGTH_TILES; x++) {
+                addBlock(x, GROUND_Y);
+                addBlock(x, GROUND_Y - 14); // Solid Top Anti-Cheese Ceiling across entire level
+            }
+
+            // LEVEL HANDCRAFTED SPECIFICS
+            switch (levelIndex) {
+                case 0: // STEREO MADNESS (Cube + Easy Jumps + Light Ship)
+                    addSpike(15, GROUND_Y - 1);
+                    addSpike(22, GROUND_Y - 1);
+                    addBlock(28, GROUND_Y - 1); addBlock(29, GROUND_Y - 1); addSpike(29, GROUND_Y - 2);
+                    addOrb(3, 35, GROUND_Y - 3); addSpike(35, GROUND_Y - 1); addSpike(36, GROUND_Y - 1);
+                    addPad(8, 45, GROUND_Y - 1); addBlock(50, GROUND_Y - 3);
+                    addPortal(12, 60, GROUND_Y - 3); // Ship Portal
+                    for (let x = 62; x < 120; x++) addBlock(x, GROUND_Y - 9); // Lower Ceiling during Ship section
+                    addBlock(75, GROUND_Y - 1); addBlock(75, GROUND_Y - 2);
+                    addBlock(90, GROUND_Y - 7); addBlock(90, GROUND_Y - 6);
+                    addPortal(11, 125, GROUND_Y - 3); // Cube Portal
+                    addPad(8, 135, GROUND_Y - 1); addOrb(3, 142, GROUND_Y - 3);
+                    addSpike(155, GROUND_Y - 1); addSpike(156, GROUND_Y - 1); addSpike(157, GROUND_Y - 1);
+                    addPortal(17, 210, GROUND_Y - 3);
+                    break;
+
+                case 1: // BACK ON TRACK (Pads & Bounces)
+                    addPad(8, 14, GROUND_Y - 1); addBlock(20, GROUND_Y - 3); addBlock(21, GROUND_Y - 3);
+                    addPad(9, 27, GROUND_Y - 1); addOrb(4, 34, GROUND_Y - 4);
+                    addSpike(40, GROUND_Y - 1); addSpike(41, GROUND_Y - 1);
+                    addPortal(13, 50, GROUND_Y - 3); // Ball Portal
+                    for (let x = 50; x < 110; x++) addBlock(x, GROUND_Y - 6);
+                    addSpike(60, GROUND_Y - 1); addSpike(70, GROUND_Y - 5); addPad(10, 80, GROUND_Y - 1);
+                    addPortal(11, 115, GROUND_Y - 3); // Cube Portal
+                    addOrb(3, 125, GROUND_Y - 2); addOrb(6, 135, GROUND_Y - 3);
+                    addSpike(150, GROUND_Y - 1); addSpike(151, GROUND_Y - 1);
+                    addPortal(17, 225, GROUND_Y - 3);
+                    break;
+
+                case 2: // POLARGEIST (Jump Orbs & Gravity Switches)
+                    addOrb(3, 15, GROUND_Y - 2); addSpike(15, GROUND_Y - 1);
+                    addOrb(4, 25, GROUND_Y - 3); addSpike(25, GROUND_Y - 1); addSpike(26, GROUND_Y - 1);
+                    addPortal(15, 38, GROUND_Y - 3); // Upside-down Gravity
+                    addBlock(45, GROUND_Y - 13); addSpike(45, GROUND_Y - 12);
+                    addOrb(5, 55, GROUND_Y - 10);
+                    addPortal(16, 70, GROUND_Y - 3); // Normal Gravity
+                    addPortal(14, 85, GROUND_Y - 3); // Wave Portal
+                    for (let i = 0; i < 50; i++) {
+                        addBlock(90 + i, GROUND_Y - 3 - Math.floor(Math.sin(i * 0.2) * 2));
+                        addBlock(90 + i, GROUND_Y - 9 - Math.floor(Math.sin(i * 0.2) * 2));
+                    }
+                    addPortal(11, 145, GROUND_Y - 3);
+                    addOrb(7, 155, GROUND_Y - 3); // Dash Orb
+                    addSpike(175, GROUND_Y - 1); addSpike(176, GROUND_Y - 1);
+                    addPortal(17, 240, GROUND_Y - 3);
+                    break;
+
+                default: // LEVELS 4 TO 10 (Dynamic Scaling Complexity)
+                    let cx = 15;
+                    while (cx < TOTAL_LENGTH_TILES - 25) {
+                        const pattern = (cx + levelIndex) % 6;
+                        if (pattern === 0) {
+                            addSpike(cx, GROUND_Y - 1);
+                            addOrb(3, cx + 3, GROUND_Y - 2);
+                            cx += 8;
+                        } else if (pattern === 1) {
+                            addBlock(cx, GROUND_Y - 1); addBlock(cx + 1, GROUND_Y - 1);
+                            addSpike(cx + 1, GROUND_Y - 2);
+                            cx += 7;
+                        } else if (pattern === 2) {
+                            addPortal(12 + (cx % 3), cx, GROUND_Y - 3); // Dynamic Portal Switch
+                            cx += 25;
+                        } else if (pattern === 3) {
+                            addOrb(5 + (cx % 3), cx, GROUND_Y - 3);
+                            addSpike(cx + 4, GROUND_Y - 1);
+                            cx += 10;
+                        } else {
+                            addPad(8 + (cx % 3), cx, GROUND_Y - 1);
+                            addBlock(cx + 4, GROUND_Y - 3);
+                            cx += 12;
+                        }
+                    }
+                    addPortal(17, TOTAL_LENGTH_TILES - 15, GROUND_Y - 3);
+                    break;
+            }
+
+            return { objects: level, levelLength: TOTAL_LENGTH_TILES * TILE_SIZE };
+        }
+
+        /* --- GAME ENGINE & STATE MANAGEMENT --- */
+        class GeometryDash {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.previewCanvas = document.getElementById('previewCanvas');
+                this.previewCtx = this.previewCanvas.getContext('2d');
+
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+
+                this.state = 'MENU'; // MENU, PLAYING, PAUSED, GAMEOVER, VICTORY
+                this.isPracticeMode = false;
+                this.currentLevelIdx = 0;
+                this.attempts = 1;
+                this.isDead = false; // Debounce death flag to fix attempt double-count
+
+                this.cameraX = 0;
+                this.cameraY = 0;
+
+                // Player Physics & State
+                this.player = {
+                    x: 100,
+                    y: 0,
+                    w: TILE_SIZE * 0.85,
+                    h: TILE_SIZE * 0.85,
+                    vx: 6.0,
+                    vy: 0,
+                    rotation: 0,
+                    gravity: 1,
+                    gamemode: 0,
+                    onGround: false,
+                    isDashing: false,
+                    dashVector: { x: 0, y: 0 },
+                    trail: []
+                };
+
+                this.input = {
+                    hold: false,
+                    pressed: false
+                };
+
+                this.checkpoints = [];
+                this.particles = [];
+                this.backgroundPulse = 0;
+
+                this.initLevel(0);
+                this.initWindow();
+                this.initControls();
+                this.initUI();
+                this.renderPreview();
+            }
+
+            initLevel(idx) {
+                this.currentLevelIdx = idx;
+                const def = LEVEL_DEFINITIONS[idx];
+                this.levelData = createLevelData(idx);
+                this.player.vx = def.speed;
+                audio.bpm = 120 + idx * 5;
+
+                // Update Level Select Display
+                document.getElementById('level-title-display').innerText = def.name;
+                document.getElementById('level-diff-display').innerText = `DIFFICULTY: ${def.diff} | SPEED: ${def.speed.toFixed(1)}x`;
+            }
+
+            initWindow() {
+                const resize = () => {
+                    this.width = window.innerWidth;
+                    this.height = window.innerHeight;
+                    this.canvas.width = this.width;
+                    this.canvas.height = this.height;
+                };
+                window.addEventListener('resize', resize);
+                resize();
+            }
+
+            initControls() {
+                const handleDown = (e) => {
+                    if (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'pointerdown') {
+                        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                        this.input.hold = true;
+                        this.input.pressed = true;
+                        audio.init();
+                    }
+                    if (e.code === 'KeyZ' && this.isPracticeMode && this.state === 'PLAYING') {
+                        this.setCheckpoint();
+                    }
+                    if (e.code === 'KeyX' && this.isPracticeMode && this.state === 'PLAYING') {
+                        this.removeCheckpoint();
+                    }
+                    if ((e.code === 'KeyP' || e.code === 'Escape') && this.state === 'PLAYING') {
+                        this.pauseGame();
+                    }
+                };
+
+                const handleUp = (e) => {
+                    if (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'pointerup') {
+                        this.input.hold = false;
+                        if (this.player.isDashing) {
+                            this.player.isDashing = false;
+                        }
+                    }
+                };
+
+                window.addEventListener('keydown', handleDown);
+                window.addEventListener('keyup', handleUp);
+                window.addEventListener('pointerdown', handleDown);
+                window.addEventListener('pointerup', handleUp);
+            }
+
+            initUI() {
+                // Color Picker Init
+                const pContainer = document.getElementById('primary-color-picker');
+                const sContainer = document.getElementById('secondary-color-picker');
+
+                COLOR_PALETTES.forEach(color => {
+                    const pBtn = document.createElement('div');
+                    pBtn.className = 'pointer-events-auto w-8 h-8 rounded-full cursor-pointer border-2 border-white/40 hover:scale-110 transition';
+                    pBtn.style.backgroundColor = color;
+                    pBtn.onclick = (e) => { e.stopPropagation(); customization.primary = color; this.renderPreview(); };
+                    pContainer.appendChild(pBtn);
+
+                    const sBtn = document.createElement('div');
+                    sBtn.className = 'pointer-events-auto w-8 h-8 rounded-full cursor-pointer border-2 border-white/40 hover:scale-110 transition';
+                    sBtn.style.backgroundColor = color;
+                    sBtn.onclick = (e) => { e.stopPropagation(); customization.secondary = color; this.renderPreview(); };
+                    sContainer.appendChild(sBtn);
+                });
+
+                document.getElementById('trail-select').onchange = (e) => {
+                    customization.trail = e.target.value;
+                };
+
+                // Level Select Carousel Buttons
+                document.getElementById('btn-prev-level').onclick = (e) => {
+                    e.stopPropagation();
+                    const newIdx = (this.currentLevelIdx - 1 + LEVEL_DEFINITIONS.length) % LEVEL_DEFINITIONS.length;
+                    this.initLevel(newIdx);
+                };
+                document.getElementById('btn-next-level').onclick = (e) => {
+                    e.stopPropagation();
+                    const newIdx = (this.currentLevelIdx + 1) % LEVEL_DEFINITIONS.length;
+                    this.initLevel(newIdx);
+                };
+
+                // Play / Customizer Buttons
+                document.getElementById('btn-play-normal').onclick = (e) => { e.stopPropagation(); this.startGame(false); };
+                document.getElementById('btn-play-practice').onclick = (e) => { e.stopPropagation(); this.startGame(true); };
+                document.getElementById('btn-customize').onclick = (e) => {
+                    e.stopPropagation();
+                    document.getElementById('customizer-modal').classList.remove('hidden');
+                };
+                document.getElementById('btn-customizer-back').onclick = (e) => {
+                    e.stopPropagation();
+                    document.getElementById('customizer-modal').classList.add('hidden');
+                };
+
+                document.getElementById('pause-btn').onclick = (e) => { e.stopPropagation(); this.pauseGame(); };
+                document.getElementById('btn-resume').onclick = (e) => { e.stopPropagation(); this.resumeGame(); };
+                document.getElementById('btn-restart').onclick = (e) => {
+                    e.stopPropagation();
+                    this.resumeGame();
+                    this.resetPlayer(true);
+                };
+                document.getElementById('btn-exit').onclick = (e) => {
+                    e.stopPropagation();
+                    this.state = 'MENU';
+                    document.getElementById('pause-modal').classList.add('hidden');
+                    document.getElementById('main-menu').classList.remove('hidden');
+                    audio.stopMusic();
+                };
+
+                document.getElementById('btn-victory-menu').onclick = (e) => {
+                    e.stopPropagation();
+                    document.getElementById('victory-modal').classList.add('hidden');
+                    document.getElementById('main-menu').classList.remove('hidden');
+                    this.state = 'MENU';
+                };
+
+                // Touch Practice Controls
+                document.getElementById('btn-checkpoint').onclick = (e) => { e.stopPropagation(); this.setCheckpoint(); };
+                document.getElementById('btn-remove-checkpoint').onclick = (e) => { e.stopPropagation(); this.removeCheckpoint(); };
+            }
+
+            startGame(practice = false) {
+                this.isPracticeMode = practice;
+                this.attempts = 1;
+                this.checkpoints = [];
+                
+                document.getElementById('main-menu').classList.add('hidden');
+                document.getElementById('practice-status').style.display = practice ? 'block' : 'none';
+                document.getElementById('touch-practice-controls').style.display = practice ? 'flex' : 'none';
+                
+                this.resetPlayer(true);
+                this.state = 'PLAYING';
+                audio.startMusic();
+            }
+
+            pauseGame() {
+                if (this.state !== 'PLAYING') return;
+                this.state = 'PAUSED';
+                document.getElementById('pause-modal').classList.remove('hidden');
+            }
+
+            resumeGame() {
+                this.state = 'PLAYING';
+                document.getElementById('pause-modal').classList.add('hidden');
+            }
+
+            resetPlayer(fullReset = false) {
+                this.isDead = false;
+                const def = LEVEL_DEFINITIONS[this.currentLevelIdx];
+                this.player.vx = def.speed;
+
+                if (!fullReset && this.isPracticeMode && this.checkpoints.length > 0) {
+                    // Restore Checkpoint
+                    const cp = this.checkpoints[this.checkpoints.length - 1];
+                    this.player.x = cp.x;
+                    this.player.y = cp.y;
+                    this.player.vy = cp.vy;
+                    this.player.gravity = cp.gravity;
+                    this.player.gamemode = cp.gamemode;
+                    this.player.rotation = 0;
+                    this.player.isDashing = false;
+                } else {
+                    // Full Reset to Level Start
+                    this.player.x = 100;
+                    this.player.y = 10 * TILE_SIZE - this.player.h - 1;
+                    this.player.vy = 0;
+                    this.player.gravity = 1;
+                    this.player.gamemode = 0; // Cube
+                    this.player.rotation = 0;
+                    this.player.isDashing = false;
+                    this.player.trail = [];
+                    if (fullReset) this.attempts = 1;
+                }
+
+                document.getElementById('attempt-banner').innerText = `ATTEMPT ${this.attempts}`;
+            }
+
+            setCheckpoint() {
+                this.checkpoints.push({
+                    x: this.player.x,
+                    y: this.player.y,
+                    vy: this.player.vy,
+                    gravity: this.player.gravity,
+                    gamemode: this.player.gamemode
+                });
+                this.addParticles(this.player.x, this.player.y, '#c084fc', 12);
+            }
+
+            removeCheckpoint() {
+                if (this.checkpoints.length > 0) {
+                    this.checkpoints.pop();
+                    this.addParticles(this.player.x, this.player.y, '#f87171', 12);
+                }
+            }
+
+            triggerDeath() {
+                if (this.isDead) return; // Single attempt lock
+                this.isDead = true;
+
+                audio.playDeath();
+                this.addParticles(this.player.x + this.player.w / 2, this.player.y + this.player.h / 2, customization.primary, 35);
+                this.attempts++;
+                
+                this.cameraY += (Math.random() - 0.5) * 20;
+
+                setTimeout(() => {
+                    this.resetPlayer(false);
+                }, 180);
+            }
+
+            triggerVictory() {
+                this.state = 'VICTORY';
+                audio.stopMusic();
+                audio.playVictory();
+                document.getElementById('victory-attempts').innerText = `Attempts: ${this.attempts}`;
+                document.getElementById('victory-modal').classList.remove('hidden');
+            }
+
+            /* --- PHYSICS & COLLISION CORE WITH ANTI-CHEESE SAFEGUARDS --- */
+            update() {
+                if (this.state !== 'PLAYING' || this.isDead) return;
+
+                const p = this.player;
+
+                // Update Trail
+                p.trail.push({ x: p.x, y: p.y, rotation: p.rotation });
+                if (p.trail.length > 12) p.trail.shift();
+
+                // 1. HORIZONTAL MOVEMENT & DASH HANDLING
+                if (p.isDashing) {
+                    p.x += p.dashVector.x * p.vx * 1.4;
+                    p.y += p.dashVector.y * p.vx * 1.4;
+                } else {
+                    p.x += p.vx;
+
+                    // 2. GAMEMODE SPECIFIC BALANCED PHYSICS
+                    switch (p.gamemode) {
+                        case 0: // CUBE MODE
+                            p.vy += GRAVITY_BASE * p.gravity;
+                            if (p.onGround && this.input.hold) {
+                                p.vy = -16.5 * p.gravity;
+                                p.onGround = false;
+                                audio.playJump();
+                            }
+                            if (!p.onGround) {
+                                p.rotation += 8 * p.gravity;
+                            } else {
+                                p.rotation = Math.round(p.rotation / 90) * 90;
+                            }
+                            break;
+
+                        case 1: // SHIP MODE (Balanced Floaty Lift)
+                            if (this.input.hold) {
+                                p.vy -= 0.75 * p.gravity;
+                            } else {
+                                p.vy += 0.75 * p.gravity;
+                            }
+                            p.vy = Math.max(-7.5, Math.min(7.5, p.vy));
+                            p.rotation = p.vy * 3.5;
+                            break;
+
+                        case 2: // BALL MODE (Instant Floor/Ceiling Gravity Flip)
+                            p.vy += GRAVITY_BASE * 1.1 * p.gravity;
+                            if (p.onGround && this.input.pressed) {
+                                p.gravity *= -1;
+                                p.vy = 4 * p.gravity;
+                                p.onGround = false;
+                                audio.playGravity();
+                            }
+                            p.rotation += 10 * p.gravity;
+                            break;
+
+                        case 3: // WAVE MODE (Zigzag Diagonal Sharp Controls)
+                            if (this.input.hold) {
+                                p.vy = -p.vx * 1.1 * p.gravity;
+                            } else {
+                                p.vy = p.vx * 1.1 * p.gravity;
+                            }
+                            p.rotation = p.vy > 0 ? 45 : -45;
+                            break;
+                    }
+                    p.y += p.vy;
+                }
+
+                p.onGround = false;
+                this.input.pressed = false;
+
+                // 3. COLLISION DETECTION & INTERACTION
+                for (let obj of this.levelData.objects) {
+                    if (Math.abs(obj.x - p.x) > TILE_SIZE * 5) continue;
+
+                    if (
+                        p.x < obj.x + obj.w &&
+                        p.x + p.w > obj.x &&
+                        p.y < obj.y + obj.h &&
+                        p.y + p.h > obj.y
+                    ) {
+                        this.handleCollision(p, obj);
+                    }
+                }
+
+                // 4. ANTI-CHEESE LEVEL BOUNDS ENFORCEMENT
+                // Fell out of bottom bounds or jumped over top ceiling structure
+                if (p.y > 14 * TILE_SIZE || p.y < -12 * TILE_SIZE) {
+                    this.triggerDeath();
+                }
+
+                // 5. CAMERA & HUD UPDATES
+                this.cameraX = p.x - this.width * 0.25;
+                this.cameraY += (p.y - this.height * 0.45 - this.cameraY) * 0.1;
+
+                const progress = Math.min(100, Math.max(0, Math.floor((p.x / this.levelData.levelLength) * 100)));
+                document.getElementById('progress-bar-inner').style.width = `${progress}%`;
+                document.getElementById('progress-text').innerText = `${progress}%`;
+
+                this.backgroundPulse = (this.backgroundPulse + 0.02) % (Math.PI * 2);
+                this.updateParticles();
+            }
+
+            handleCollision(p, obj) {
+                if (this.isDead) return;
+
+                // BLOCK COLLISION
+                if (obj.type === 1) {
+                    const prevX = p.x - p.vx;
+                    const prevY = p.y - p.vy;
+
+                    if (prevY + p.h <= obj.y + 6 && p.gravity === 1) {
+                        p.y = obj.y - p.h;
+                        p.vy = 0;
+                        p.onGround = true;
+                    } 
+                    else if (prevY >= obj.y + obj.h - 6 && p.gravity === -1) {
+                        p.y = obj.y + obj.h;
+                        p.vy = 0;
+                        p.onGround = true;
+                    }
+                    else if (prevY >= obj.y + obj.h - 6 && p.gravity === 1) {
+                        p.y = obj.y + obj.h;
+                        p.vy = 0;
+                    }
+                    else {
+                        this.triggerDeath();
+                    }
+                }
+
+                // SPIKE HAZARD
+                else if (obj.type === 2) {
+                    if (p.x + p.w * 0.8 > obj.x + 6 && p.x + p.w * 0.2 < obj.x + obj.w - 6) {
+                        this.triggerDeath();
+                    }
+                }
+
+                // ORBS INTERACTION
+                else if ([3, 4, 5, 6, 7].includes(obj.type)) {
+                    if (this.input.hold || this.input.pressed) {
+                        switch (obj.type) {
+                            case 3: // Yellow Orb
+                                p.vy = -17.5 * p.gravity;
+                                audio.playOrb();
+                                this.addParticles(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, '#eab308', 15);
+                                break;
+                            case 4: // Pink Orb
+                                p.vy = -12 * p.gravity;
+                                audio.playOrb();
+                                this.addParticles(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, '#ec4899', 15);
+                                break;
+                            case 5: // Blue Orb
+                                p.gravity *= -1;
+                                p.vy = -8 * p.gravity;
+                                audio.playGravity();
+                                this.addParticles(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, '#3b82f6', 15);
+                                break;
+                            case 6: // Green Orb
+                                p.gravity *= -1;
+                                p.vy = -14 * p.gravity;
+                                audio.playGravity();
+                                this.addParticles(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, '#22c55e', 15);
+                                break;
+                            case 7: // Dash Orb
+                                p.isDashing = true;
+                                p.dashVector = { x: 1, y: 0 };
+                                p.vy = 0;
+                                audio.playOrb();
+                                this.addParticles(obj.x + TILE_SIZE / 2, obj.y + TILE_SIZE / 2, '#10b981', 15);
+                                break;
+                        }
+                    }
+                }
+
+                // PADS INTERACTION
+                else if ([8, 9, 10].includes(obj.type)) {
+                    switch (obj.type) {
+                        case 8: // Yellow Pad
+                            p.vy = -19 * p.gravity;
+                            audio.playOrb();
+                            break;
+                        case 9: // Pink Pad
+                            p.vy = -13 * p.gravity;
+                            audio.playOrb();
+                            break;
+                        case 10: // Blue Pad
+                            p.gravity *= -1;
+                            p.vy = 6 * p.gravity;
+                            audio.playGravity();
+                            break;
+                    }
+                }
+
+                // PORTALS INTERACTION
+                else if ([11, 12, 13, 14, 15, 16].includes(obj.type)) {
+                    if (obj.type >= 11 && obj.type <= 14) {
+                        const targetMode = obj.type - 11;
+                        if (p.gamemode !== targetMode) {
+                            p.gamemode = targetMode;
+                            audio.playPortal();
+                            this.addParticles(obj.x, obj.y + obj.h / 2, '#a855f7', 20);
+                        }
+                    } else if (obj.type === 15 && p.gravity !== -1) {
+                        p.gravity = -1;
+                        audio.playGravity();
+                    } else if (obj.type === 16 && p.gravity !== 1) {
+                        p.gravity = 1;
+                        audio.playGravity();
+                    }
+                }
+
+                // END PORTAL
+                else if (obj.type === 17) {
+                    this.triggerVictory();
+                }
+            }
+
+            /* --- PARTICLE SYSTEM --- */
+            addParticles(x, y, color, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: (Math.random() - 0.5) * 12,
+                        vy: (Math.random() - 0.5) * 12,
+                        size: Math.random() * 6 + 2,
+                        color: color,
+                        life: 1.0,
+                        decay: Math.random() * 0.05 + 0.02
+                    });
+                }
+            }
+
+            updateParticles() {
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    let pt = this.particles[i];
+                    pt.x += pt.vx;
+                    pt.y += pt.vy;
+                    pt.life -= pt.decay;
+                    if (pt.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            /* --- DISTINCT SYMBOL DRAWING & RENDERING ENGINE --- */
+            draw() {
+                this.ctx.clearRect(0, 0, this.width, this.height);
+
+                this.drawBackground();
+
+                this.ctx.save();
+                this.ctx.translate(-this.cameraX, -this.cameraY);
+
+                for (let obj of this.levelData.objects) {
+                    if (obj.x + obj.w < this.cameraX || obj.x > this.cameraX + this.width) continue;
+                    this.drawObject(obj);
+                }
+
+                if (this.isPracticeMode) {
+                    for (let cp of this.checkpoints) {
+                        this.ctx.fillStyle = '#c084fc';
+                        this.ctx.beginPath();
+                        this.ctx.arc(cp.x, cp.y, 10, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.stroke();
+                    }
+                }
+
+                this.drawTrail();
+                this.drawPlayer(this.player.x, this.player.y, this.player.rotation, customization.primary, customization.secondary);
+
+                for (let pt of this.particles) {
+                    this.ctx.globalAlpha = pt.life;
+                    this.ctx.fillStyle = pt.color;
+                    this.ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
+                }
+                this.ctx.globalAlpha = 1.0;
+
+                this.ctx.restore();
+            }
+
+            drawBackground() {
+                const def = LEVEL_DEFINITIONS[this.currentLevelIdx];
+                const pulseVal = Math.sin(this.backgroundPulse) * 0.15 + 0.85;
+                const grad = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                grad.addColorStop(0, def.bg);
+                grad.addColorStop(1, '#02050c');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                this.ctx.strokeStyle = `rgba(0, 240, 255, ${0.08 * pulseVal})`;
+                this.ctx.lineWidth = 1;
+                const gridSize = 60;
+                const offsetX = -this.cameraX * 0.3 % gridSize;
+
+                for (let x = offsetX; x < this.width; x += gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawPlayer(x, y, rotation, primary, secondary, targetCtx = this.ctx) {
+                targetCtx.save();
+                targetCtx.translate(x + TILE_SIZE * 0.425, y + TILE_SIZE * 0.425);
+                targetCtx.rotate((rotation * Math.PI) / 180);
+
+                targetCtx.fillStyle = primary;
+                targetCtx.fillRect(-TILE_SIZE * 0.425, -TILE_SIZE * 0.425, TILE_SIZE * 0.85, TILE_SIZE * 0.85);
+
+                targetCtx.fillStyle = secondary;
+                targetCtx.fillRect(-TILE_SIZE * 0.25, -TILE_SIZE * 0.25, TILE_SIZE * 0.5, TILE_SIZE * 0.5);
+
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.fillRect(-10, -8, 6, 8);
+                targetCtx.fillRect(4, -8, 6, 8);
+                
+                targetCtx.fillStyle = '#000000';
+                targetCtx.fillRect(-8, -6, 3, 4);
+                targetCtx.fillRect(6, -6, 3, 4);
+
+                targetCtx.strokeStyle = '#ffffff';
+                targetCtx.lineWidth = 2.5;
+                targetCtx.strokeRect(-TILE_SIZE * 0.425, -TILE_SIZE * 0.425, TILE_SIZE * 0.85, TILE_SIZE * 0.85);
+
+                targetCtx.restore();
+            }
+
+            drawTrail() {
+                const trail = this.player.trail;
+                for (let i = 0; i < trail.length; i++) {
+                    const ratio = i / trail.length;
+                    this.ctx.globalAlpha = ratio * 0.4;
+                    this.ctx.fillStyle = customization.trail === 'fire' ? '#ff4500' : customization.primary;
+                    this.ctx.fillRect(
+                        trail[i].x + (1 - ratio) * 5,
+                        trail[i].y + (1 - ratio) * 5,
+                        this.player.w * ratio,
+                        this.player.h * ratio
+                    );
+                }
+                this.ctx.globalAlpha = 1.0;
+            }
+
+            drawObject(obj) {
+                this.ctx.save();
+                const cx = obj.x + obj.w / 2;
+                const cy = obj.y + obj.h / 2;
+
+                switch (obj.type) {
+                    case 1: // BLOCK
+                        this.ctx.fillStyle = '#0f172a';
+                        this.ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                        this.ctx.strokeStyle = '#00f0ff';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+                        this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                        this.ctx.strokeRect(obj.x + 4, obj.y + 4, obj.w - 8, obj.h - 8);
+                        break;
+
+                    case 2: // SPIKE
+                        this.ctx.fillStyle = '#ff0055';
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(obj.x, obj.y + obj.h);
+                        this.ctx.lineTo(cx, obj.y);
+                        this.ctx.lineTo(obj.x + obj.w, obj.y + obj.h);
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.stroke();
+                        break;
+
+                    case 3: case 4: case 5: case 6: case 7: // ORBS WITH DISTINCT SYMBOLS
+                        const orbColors = { 3: '#eab308', 4: '#ec4899', 5: '#3b82f6', 6: '#22c55e', 7: '#10b981' };
+                        const orbSymbols = { 3: '▲', 4: '+', 5: '⇅', 6: '⇡', 7: '➔' };
+                        
+                        this.ctx.strokeStyle = orbColors[obj.type];
+                        this.ctx.lineWidth = 3;
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, obj.w / 2.2, 0, Math.PI * 2);
+                        this.ctx.stroke();
+
+                        this.ctx.fillStyle = '#ffffff';
+                        this.ctx.beginPath();
+                        this.ctx.arc(cx, cy, obj.w / 4, 0, Math.PI * 2);
+                        this.ctx.fill();
+
+                        // Distinct symbol render
+                        this.ctx.fillStyle = '#000000';
+                        this.ctx.font = 'bold 12px sans-serif';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText(orbSymbols[obj.type], cx, cy);
+                        break;
+
+                    case 8: case 9: case 10: // PADS
+                        const padColors = { 8: '#eab308', 9: '#ec4899', 10: '#3b82f6' };
+                        this.ctx.fillStyle = padColors[obj.type];
+                        this.ctx.fillRect(obj.x, obj.y + TILE_SIZE * 0.75, obj.w, TILE_SIZE * 0.25);
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.strokeRect(obj.x, obj.y + TILE_SIZE * 0.75, obj.w, TILE_SIZE * 0.25);
+                        break;
+
+                    case 11: case 12: case 13: case 14: case 15: case 16: case 17: // PORTALS
+                        const portalColors = { 11: '#22c55e', 12: '#ec4899', 13: '#eab308', 14: '#3b82f6', 15: '#a855f7', 16: '#06b6d4', 17: '#f59e0b' };
+                        const portalSymbols = { 11: '⬛', 12: '🚀', 13: '⚽', 14: '∿', 15: '↓', 16: '↑', 17: '🏆' };
+
+                        this.ctx.strokeStyle = portalColors[obj.type];
+                        this.ctx.lineWidth = 4;
+                        this.ctx.beginPath();
+                        this.ctx.ellipse(cx, cy, obj.w / 2, obj.h / 2, 0, 0, Math.PI * 2);
+                        this.ctx.stroke();
+
+                        this.ctx.fillStyle = portalColors[obj.type];
+                        this.ctx.globalAlpha = 0.35;
+                        this.ctx.fill();
+                        this.ctx.globalAlpha = 1.0;
+
+                        this.ctx.fillStyle = '#ffffff';
+                        this.ctx.font = 'bold 16px sans-serif';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText(portalSymbols[obj.type], cx, cy);
+                        break;
+                }
+
+                this.ctx.restore();
+            }
+
+            renderPreview() {
+                this.previewCtx.clearRect(0, 0, 80, 80);
+                this.drawPlayer(20, 20, 0, customization.primary, customization.secondary, this.previewCtx);
+            }
+
+            loop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        window.onload = () => {
+            const game = new GeometryDash();
+            game.loop();
+        };
+    </script>
+</body>
+</html>
